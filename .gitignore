@@ -1,0 +1,15 @@
+# Build artifacts
+bin/
+
+# Project stuff
+.vscode/
+.idea/
+
+# Mac stuff
+.DS_Store
+
+# Local dependency mapping
+barrels.jungle
+
+# .bak files
+**/*.bak
