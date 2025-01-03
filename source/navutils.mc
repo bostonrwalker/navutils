@@ -2,14 +2,38 @@ import Toybox.Lang;
 import Toybox.Time;
 import Toybox.Position;
 import Toybox.Math;
+import Toybox.Test;
 
 
 const TWO_PI = 2 * Math.PI as Float;
 
 
+
+function getDefault(dict as Dictionary, key as Object, defaultValue as Object?) as Object? {
+    /*
+    Get a value from a dictionary, returning a default value if the key does not exist
+    */
+    return dict.hasKey(key) ? dict[key] : defaultValue;
+}
+
+function _assertFloatEqual(actual as Float?, expected as Float?) as Void {
+    if (expected != null && actual != null) {
+        var tol = 1e-6;
+        var diff = (actual - expected).abs();
+        if (diff > tol) {
+            throw new Test.AssertException("ASSERTION FAILED -- expected: " + expected.toString() + ", actual: " + actual.toString());
+        }
+    } else if (expected == null && actual != null) {
+        throw new Test.AssertException("ASSERTION FAILED -- expected: null, actual: " + actual.toString());
+    } else if (expected != null && actual == null) {
+        throw new Test.AssertException("ASSERTION FAILED -- expected: " + expected.toString() + ", actual: null");
+    }
+}
+
+
 module NavUtils {
 
-    function addRadians(angle as Float, delta as Float) as Float {
+    function addRadians(angle as Float?, delta as Float?) as Float? {
         /*
         Add radians to a base angle, while keeping in [0, 2 pi) range
 
@@ -17,6 +41,9 @@ module NavUtils {
         :param delta: Differential angle in radians. Must be in range [-2 * pi, 2 * pi)
         :return: (a + b) mod 2 * pi, in range [0, 2 * pi)
         */
+        if (angle == null || delta == null) {
+            return null;
+        }
         var result = angle + delta;
         if (result < 0) {
             result += TWO_PI;
@@ -53,7 +80,59 @@ module NavUtils {
         }
     }
 
-    function getBearingFromMagneticNorth(a as Array<Numeric>, m as Array<Numeric>, options as {
+    function degreesToRads(degrees as Numeric?) as Float? {
+        // Convert degrees to radians
+        if (degrees == null) {
+            return null;
+        } else {
+            return degrees * TWO_PI / 360.0;
+        }
+    }
+
+    function radsToDegrees(rads as Float?) as Float? {
+        // Convert radians to degrees
+        if (rads == null) {
+            return null;
+        } else {
+            return rads * 360.0 / TWO_PI;
+        }
+    }
+
+    function decimalDegreesToDMS(degrees as Numeric) as [Number, Number, Number] {
+        /*
+        Convert decimal degrees to integer degrees, minutes, seconds
+
+        Return values are rounded to the nearest second.
+
+        :param degrees: Decimal degrees. Must be non-negative, i.e. in range [0, infinity).
+        :return: Tuple [degrees, minutes, seconds]
+        */
+        if (degrees < 0) {
+            throw new Lang.InvalidValueException(
+                "`degrees` must be non-negative");
+        } else {
+            var seconds = Math.round(degrees * 3600).toNumber();
+            return [
+                seconds / 3600,  // Degrees
+                (seconds % 3600) / 60,  // Minutes
+                seconds % 60,  // Seconds
+            ];
+        }
+    }
+
+    function dmsToDecimalDegrees(degrees as Number, minutes as Number, seconds as Number) as Float {
+        /*
+        Convert integer degrees, minutes, seconds to decimal degrees
+
+        :param degrees: Degrees. Must be non-negative, i.e. in range [0, infinity).
+        :param minutes: Minutes. Must be non-negative, i.e. in range [0, infinity).
+        :param seconds: Seconds. Must be non-negative, i.e. in range [0, infinity).
+        :return: Value in decimal degrees.
+        */
+        return degrees.toFloat() + minutes / 60.0 + seconds / 3600.0;
+    }
+
+    function getBearingFromMagneticNorth(a as [Numeric, Numeric, Numeric]?, m as [Numeric, Numeric, Numeric]?, options as {
             :minAccelerometer as Numeric, :minMagnetometer as Numeric, :minAngle as Numeric}) as Float? {
         /*
         Compute bearing of device vs. magnetic north
@@ -71,11 +150,16 @@ module NavUtils {
             :minAccelerometer: Minimum magnitude of accelerometer reading in milli-Gs (default: 750)
             :minMagnetometer: Minimum magnitude of magnetometer reading in milli-Gauss (default: 100)
             :minAngle: Minimum angle in degrees between accelerometer and magnetometer (default: 8)
-        :return: Bearing in radians (if defined)
-        */
-        var minAccelerometer = Codex.Utils.getDefault(options, :minAccelerometer, 750.0) as Float;
-        var minMagnetometer = Codex.Utils.getDefault(options, :minMagnetometer, 100.0) as Float;
-        var minAngleDegrees = Codex.Utils.getDefault(options, :minAngle, 8.0) as Numeric;
+        :return: Bearing in radians (if defined) in range [0, 2 * pi)
+        */       
+        var minAccelerometer = getDefault(options, :minAccelerometer, 750.0) as Float;
+        var minMagnetometer = getDefault(options, :minMagnetometer, 100.0) as Float;
+        var minAngleDegrees = getDefault(options, :minAngle, 8.0) as Numeric;
+
+        if ((a == null) || (m == null)) {
+            // Null sensor data sometimes supplied on app startup
+            return null;
+        }
 
         // Unpack arrays
         var ax = a[0];
@@ -118,6 +202,10 @@ module NavUtils {
         var mLatZ = mz - aDotM * az;
 
         var magMLat = Math.sqrt(mLatX * mLatX + mLatY * mLatY + mLatZ * mLatZ);
+        if (magMLat == 0) {
+            // This shouldn't happen
+            return null;
+        }
 
         mLatX /= magMLat;
         mLatY /= magMLat;
@@ -129,6 +217,10 @@ module NavUtils {
         var rLatZ = -ax * az;
 
         var magRLat = Math.sqrt(rLatX * rLatX + rLatY * rLatY + rLatZ * rLatZ);
+        if (magRLat == 0) {
+            // This shouldn't happen
+            return null;
+        }
 
         rLatX /= magRLat;
         rLatY /= magRLat;
@@ -143,6 +235,136 @@ module NavUtils {
 
         // Equivalent to atan2(sin(theta - (pi / 2)), cos(theta - (pi / 2)))
         // Need to apply a 90 degree phase shift since the reference vector points E when facing N.
-        return Math.atan2(-cosTheta, sinTheta);
+        var angle = Math.atan2(-cosTheta, sinTheta);
+        if (angle < 0) {
+            // Ensure angle is in range [0, 2 * pi)
+            angle += TWO_PI;
+        }
+        return angle;
+    }
+
+    function applyMagneticDeclination(heading as Float?, magDec as Float?) as Float? {
+        /*
+        Subtract magnetic declination from magnetic N heading
+
+        :param heading: Heading from magnetic N in rads
+        :param magDec: Mag dec in degrees. Per convention W is positive and E is negative.
+        */
+        return addRadians(heading, -degreesToRads(magDec));
+    }
+
+
+    (:test)
+    function testAddRadians(logger as Logger) as Boolean {
+        _assertFloatEqual(addRadians(0.0, Math.PI / 2), Math.PI / 2);
+        _assertFloatEqual(addRadians(0.0, -Math.PI / 2), 3 * Math.PI / 2);
+        _assertFloatEqual(addRadians(0.0, 2 * Math.PI), 0.0);
+        _assertFloatEqual(addRadians(0.0, -2 * Math.PI), 0.0);
+        _assertFloatEqual(addRadians(Math.PI, Math.PI), 0.0);
+        _assertFloatEqual(addRadians(Math.PI / 2, -Math.PI / 2), 0.0);
+        return true;
+    }
+
+
+    (:test)
+    function testGetBearingFromMagneticNorth(logger as Logger) as Boolean {
+
+        // Test scenario 1: Magnetic field of 400 uT parallel to ground
+
+        // --- FACING N --- //
+        // Looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 400.0, 0.0], {}), 0.0);
+
+        // Bring the device to eye level
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0);
+
+        // Tilt it 45* left or right
+        _assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0);
+        _assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0);
+
+        // Looking straight up at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, -400.0, 0.0], {}), 0.0);
+
+        // --- FACING NE --- //
+        // Looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, 283.0, 0.0], {}), Math.PI / 4);
+
+        // --- FACING E --- //
+        // Looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2);
+
+        // Bring the device to eye level
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2);
+
+        // Tilt it 45* left or right
+        _assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [-283.0, 283.0, 0.0], {}), Math.PI / 2);
+        _assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [-283.0, -283.0, 0.0], {}), Math.PI / 2);
+
+        // Looking straight up at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2);
+
+        // --- FACING SE --- //
+        // Looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, -283.0, 0.0], {}), 3 * Math.PI / 4);
+
+        // --- FACING S --- //
+        // Looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, -400.0, 0.0], {}), Math.PI);
+
+        // Bring the device to eye level
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI);
+
+        // Tilt it 45* left or right
+        _assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI);
+        _assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI);
+
+        // Looking straight up at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 400.0, 0.0], {}), Math.PI);
+
+        // --- FACING SW --- //
+        // Looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, -283.0, 0.0], {}), 5 * Math.PI / 4);
+
+        // --- FACING W --- //
+        // Looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2);
+
+        // Bring the device to eye level
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2);
+
+        // Tilt it 45* left or right
+        _assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [283.0, -283.0, 0.0], {}), 3 * Math.PI / 2);
+        _assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [283.0, 283.0, 0.0], {}), 3 * Math.PI / 2);
+
+        // Looking straight up at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2);
+
+        // --- FACING NW --- //
+        // Looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, 283.0, 0.0], {}), 7 * Math.PI / 4);
+
+
+        // Test scenario 2: Magnetic field of 500 uT running down into ground at 53.13 degrees (3-4-5 triangle)
+
+        // Facing N, looking down at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 300.0, -400.0], {}), 0.0);
+
+        // Facing W, looking across at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-300.0, -400.0, 0.0], {}), Math.PI / 2);
+
+        // Facing S, looking straight up at device
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 300.0, 400.0], {}), Math.PI);
+
+
+        // Test scenario 3: Magnetic field aligned with gravity
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 0.0, -500.0], {}), null);
+
+        // Test scenario 4: Weak magnetic field
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 50.0, 0.0], {}), null);
+
+        // Test scenario 5: Weak gravity
+        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -500.0], [0.0, 300.0, 0.0], {}), null);
+
+        return true;
     }
 }
