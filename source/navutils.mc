@@ -8,7 +8,6 @@ import Toybox.Test;
 const TWO_PI = 2 * Math.PI as Float;
 
 
-
 function getDefault(dict as Dictionary, key as Object, defaultValue as Object?) as Object? {
     /*
     Get a value from a dictionary, returning a default value if the key does not exist
@@ -367,4 +366,39 @@ module NavUtils {
 
         return true;
     }
+
+
+    /*
+    static function getGridConvergence(location as Position.Location) as Float {
+        // Get UTM / MGRS grid convergence (difference between grid north and true north) at location
+        // [True North] = [Grid North] + [Grid Convergence]
+        var mgrs = location.toGeoString(Position.GEO_MGRS);
+        var grid = mgrs.substring(0, 5);
+        var easting = mgrs.substring(5, 10).asNumber();
+        var northing = mgrs.substring(10, 15).asNumber();
+
+        var testDistance = 10000.0;  // 10 km
+        var testDirections = [0.0, Math.PI];  // N, S
+
+        for (var i = 0; i < testDirections.size(); i++) {
+            var testDirection = testDirections[i];
+            var testLocation = location.getProjectedLocation(testDirection, 10000.0);
+            var testMgrs = testLocation.toGeoString(Position.GEO_MGRS);
+            if (testMgrs.substring(0, 5).equals(grid)) {
+                // We are still in the same MGRS grid, can do calculation
+                var testEasting = testMgrs.substring(5, 10).asNumber();
+                var testNorthing = testMgrs.substring(10, 15).asNumber();
+                var directionUTM = Math.atan2(testNorthing - northing, testEasting - easting);
+                var convergence = testDirection - directionUTM;
+                if (convergence > Math.PI) {
+                    convergence -= 2.0 * Math.PI;
+                }
+                return convergence;
+            }
+        }
+
+        // This should never happen - either of 10km N or 10km S should always be within the same grid
+        throw InvalidValueException("");
+    }
+    */
 }
