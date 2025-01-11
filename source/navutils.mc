@@ -5,34 +5,53 @@ import Toybox.Math;
 import Toybox.Test;
 
 
-const TWO_PI = 2 * Math.PI as Float;
+/*******************************************************************************
+Main NavUtils module
+********************************************************************************
+Functions for working with headings in Degrees, DMS, Radians, and Mils
 
-
-function getDefault(dict as Dictionary, key as Object, defaultValue as Object?) as Object? {
-    /*
-    Get a value from a dictionary, returning a default value if the key does not exist
-    */
-    return dict.hasKey(key) ? dict[key] : defaultValue;
-}
-
-function _assertFloatEqual(actual as Float?, expected as Float?) as Void {
-    if (expected != null && actual != null) {
-        var tol = 1e-6;
-        var diff = (actual - expected).abs();
-        if (diff > tol) {
-            throw new Test.AssertException("ASSERTION FAILED -- expected: " + expected.toString() + ", actual: " + actual.toString());
-        }
-    } else if (expected == null && actual != null) {
-        throw new Test.AssertException("ASSERTION FAILED -- expected: null, actual: " + actual.toString());
-    } else if (expected != null && actual == null) {
-        throw new Test.AssertException("ASSERTION FAILED -- expected: " + expected.toString() + ", actual: null");
-    }
-}
+Created: 11 Jan 2025 by Boston W
+*******************************************************************************/
 
 
 module NavUtils {
+    /*
+    Radians type alias. Added for clarity when defining method signatures.
 
-    function addRadians(angle as Float?, delta as Float?) as Float? {
+    Range: [-2 * pi, 2 * pi)
+    */
+    typedef Radians as Float;
+
+    /*
+    Decimal degrees type alias. Added for clarity when defining method signatures.
+
+    Range: [-180, 180)
+    */
+    typedef DecimalDegrees as Numeric;
+
+    /*
+    Lat/long (geodetic) type:
+    
+    [0]: Latitude in decimal degrees (+ve for N, -ve for S)
+    [1]: Longitude in decimal degrees (+ve for E, -ve for W)
+    */
+    typedef LatLong as [DecimalDegrees, DecimalDegrees];
+
+    /*
+    Degrees, minutes, seconds:
+
+    [0]: Integer degrees East (+ve) or West (-ve), range: [-180, 180)
+    [1]: Integer minutes, range: [0, 60)
+    [2]: Integer or decimal seconds, range: [0, 60)
+    */
+    typedef DMS as [Number, Number, Numeric];
+
+    /*
+    Integer mils. Added for clarity when defining method signatures. Range: [0, 6400)
+    */
+    typedef Mils as Number;
+
+    function addRadians(angle as Radians?, delta as Radians?) as Radians? {
         /*
         Add radians to a base angle, while keeping in [0, 2 pi) range
 
@@ -52,7 +71,7 @@ module NavUtils {
         return result;
     }
 
-    function radsToMils(radians as Numeric?) as Number? {
+    function radsToMils(radians as Radians?) as Mils? {
         /*
         Convert radians to mils
 
@@ -70,7 +89,7 @@ module NavUtils {
         }
     }
 
-    function milsToRads(mils as Number?) as Float? {
+    function milsToRads(mils as Mils?) as Radians? {
         // Convert radians to mils
         if (mils == null) {
             return null;
@@ -79,7 +98,7 @@ module NavUtils {
         }
     }
 
-    function degreesToRads(degrees as Numeric?) as Float? {
+    function degreesToRads(degrees as DecimalDegrees?) as Radians? {
         // Convert degrees to radians
         if (degrees == null) {
             return null;
@@ -88,7 +107,7 @@ module NavUtils {
         }
     }
 
-    function radsToDegrees(rads as Float?) as Float? {
+    function radsToDegrees(rads as Radians?) as DecimalDegrees? {
         // Convert radians to degrees
         if (rads == null) {
             return null;
@@ -97,7 +116,7 @@ module NavUtils {
         }
     }
 
-    function decimalDegreesToDMS(degrees as Numeric) as [Number, Number, Number] {
+    function decimalDegreesToDMS(degrees as DecimalDegrees) as DMS {
         /*
         Convert decimal degrees to integer degrees, minutes, seconds
 
@@ -119,7 +138,7 @@ module NavUtils {
         }
     }
 
-    function dmsToDecimalDegrees(degrees as Number, minutes as Number, seconds as Number) as Float {
+    function dmsToDecimalDegrees(dms as DMS) as DecimalDegrees {
         /*
         Convert integer degrees, minutes, seconds to decimal degrees
 
@@ -128,11 +147,15 @@ module NavUtils {
         :param seconds: Seconds. Must be non-negative, i.e. in range [0, infinity).
         :return: Value in decimal degrees.
         */
+        var degrees = dms[0];
+        var minutes = dms[1];
+        var seconds = dms[2];
+
         return degrees.toFloat() + minutes / 60.0 + seconds / 3600.0;
     }
 
     function getBearingFromMagneticNorth(a as [Numeric, Numeric, Numeric]?, m as [Numeric, Numeric, Numeric]?, options as {
-            :minAccelerometer as Numeric, :minMagnetometer as Numeric, :minAngle as Numeric}) as Float? {
+            :minAccelerometer as Numeric, :minMagnetometer as Numeric, :minAngle as Numeric}) as Radians? {
         /*
         Compute bearing of device vs. magnetic north
 
@@ -242,7 +265,7 @@ module NavUtils {
         return angle;
     }
 
-    function applyMagneticDeclination(heading as Float?, magDec as Float?) as Float? {
+    function applyMagneticDeclination(heading as Radians?, magDec as Radians?) as Radians? {
         /*
         Subtract magnetic declination from magnetic N heading
 
@@ -255,12 +278,12 @@ module NavUtils {
 
     (:test)
     function testAddRadians(logger as Logger) as Boolean {
-        _assertFloatEqual(addRadians(0.0, Math.PI / 2), Math.PI / 2);
-        _assertFloatEqual(addRadians(0.0, -Math.PI / 2), 3 * Math.PI / 2);
-        _assertFloatEqual(addRadians(0.0, 2 * Math.PI), 0.0);
-        _assertFloatEqual(addRadians(0.0, -2 * Math.PI), 0.0);
-        _assertFloatEqual(addRadians(Math.PI, Math.PI), 0.0);
-        _assertFloatEqual(addRadians(Math.PI / 2, -Math.PI / 2), 0.0);
+        assertFloatEqual(addRadians(0.0, Math.PI / 2), Math.PI / 2, {:tol => 1e-6});
+        assertFloatEqual(addRadians(0.0, -Math.PI / 2), 3 * Math.PI / 2, {:tol => 1e-6});
+        assertFloatEqual(addRadians(0.0, 2 * Math.PI), 0.0, {:tol => 1e-6});
+        assertFloatEqual(addRadians(0.0, -2 * Math.PI), 0.0, {:tol => 1e-6});
+        assertFloatEqual(addRadians(Math.PI, Math.PI), 0.0, {:tol => 1e-6});
+        assertFloatEqual(addRadians(Math.PI / 2, -Math.PI / 2), 0.0, {:tol => 1e-6});
         return true;
     }
 
@@ -272,133 +295,98 @@ module NavUtils {
 
         // --- FACING N --- //
         // Looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 400.0, 0.0], {}), 0.0);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 400.0, 0.0], {}), 0.0, {:tol => 1e-6});
 
         // Bring the device to eye level
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
 
         // Tilt it 45* left or right
-        _assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0);
-        _assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0);
+        assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
+        assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
 
         // Looking straight up at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, -400.0, 0.0], {}), 0.0);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, -400.0, 0.0], {}), 0.0, {:tol => 1e-6});
 
         // --- FACING NE --- //
         // Looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, 283.0, 0.0], {}), Math.PI / 4);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, 283.0, 0.0], {}), Math.PI / 4, {:tol => 1e-6});
 
         // --- FACING E --- //
         // Looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // Bring the device to eye level
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // Tilt it 45* left or right
-        _assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [-283.0, 283.0, 0.0], {}), Math.PI / 2);
-        _assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [-283.0, -283.0, 0.0], {}), Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [-283.0, 283.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
+        assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [-283.0, -283.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // Looking straight up at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // --- FACING SE --- //
         // Looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, -283.0, 0.0], {}), 3 * Math.PI / 4);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, -283.0, 0.0], {}), 3 * Math.PI / 4, {:tol => 1e-6});
 
         // --- FACING S --- //
         // Looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, -400.0, 0.0], {}), Math.PI);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, -400.0, 0.0], {}), Math.PI, {:tol => 1e-6});
 
         // Bring the device to eye level
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
 
         // Tilt it 45* left or right
-        _assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI);
-        _assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI);
+        assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
+        assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
 
         // Looking straight up at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 400.0, 0.0], {}), Math.PI);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 400.0, 0.0], {}), Math.PI, {:tol => 1e-6});
 
         // --- FACING SW --- //
         // Looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, -283.0, 0.0], {}), 5 * Math.PI / 4);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, -283.0, 0.0], {}), 5 * Math.PI / 4, {:tol => 1e-6});
 
         // --- FACING W --- //
         // Looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
 
         // Bring the device to eye level
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
 
         // Tilt it 45* left or right
-        _assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [283.0, -283.0, 0.0], {}), 3 * Math.PI / 2);
-        _assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [283.0, 283.0, 0.0], {}), 3 * Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [283.0, -283.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
+        assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [283.0, 283.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
 
         // Looking straight up at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
 
         // --- FACING NW --- //
         // Looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, 283.0, 0.0], {}), 7 * Math.PI / 4);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, 283.0, 0.0], {}), 7 * Math.PI / 4, {:tol => 1e-6});
 
 
         // Test scenario 2: Magnetic field of 500 uT running down into ground at 53.13 degrees (3-4-5 triangle)
 
         // Facing N, looking down at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 300.0, -400.0], {}), 0.0);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 300.0, -400.0], {}), 0.0, {:tol => 1e-6});
 
         // Facing W, looking across at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-300.0, -400.0, 0.0], {}), Math.PI / 2);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-300.0, -400.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // Facing S, looking straight up at device
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 300.0, 400.0], {}), Math.PI);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 300.0, 400.0], {}), Math.PI, {:tol => 1e-6});
 
 
         // Test scenario 3: Magnetic field aligned with gravity
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 0.0, -500.0], {}), null);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 0.0, -500.0], {}), null, {});
 
         // Test scenario 4: Weak magnetic field
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 50.0, 0.0], {}), null);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 50.0, 0.0], {}), null, {});
 
         // Test scenario 5: Weak gravity
-        _assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -500.0], [0.0, 300.0, 0.0], {}), null);
+        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -500.0], [0.0, 300.0, 0.0], {}), null, {});
 
         return true;
     }
-
-
-    /*
-    static function getGridConvergence(location as Position.Location) as Float {
-        // Get UTM / MGRS grid convergence (difference between grid north and true north) at location
-        // [True North] = [Grid North] + [Grid Convergence]
-        var mgrs = location.toGeoString(Position.GEO_MGRS);
-        var grid = mgrs.substring(0, 5);
-        var easting = mgrs.substring(5, 10).asNumber();
-        var northing = mgrs.substring(10, 15).asNumber();
-
-        var testDistance = 10000.0;  // 10 km
-        var testDirections = [0.0, Math.PI];  // N, S
-
-        for (var i = 0; i < testDirections.size(); i++) {
-            var testDirection = testDirections[i];
-            var testLocation = location.getProjectedLocation(testDirection, 10000.0);
-            var testMgrs = testLocation.toGeoString(Position.GEO_MGRS);
-            if (testMgrs.substring(0, 5).equals(grid)) {
-                // We are still in the same MGRS grid, can do calculation
-                var testEasting = testMgrs.substring(5, 10).asNumber();
-                var testNorthing = testMgrs.substring(10, 15).asNumber();
-                var directionUTM = Math.atan2(testNorthing - northing, testEasting - easting);
-                var convergence = testDirection - directionUTM;
-                if (convergence > Math.PI) {
-                    convergence -= 2.0 * Math.PI;
-                }
-                return convergence;
-            }
-        }
-
-        // This should never happen - either of 10km N or 10km S should always be within the same grid
-        throw InvalidValueException("");
-    }
-    */
 }
