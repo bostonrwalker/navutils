@@ -51,6 +51,37 @@ module NavUtils {
     */
     typedef Mils as Number;
 
+
+    function readLatLong(str as String) as LatLong {
+        /*
+        Parse comma-separated decimal lat/long string
+    
+        :raise: InvalidValueException if string is invalid
+        */
+        var parts = StringUtils.split(str, ",");
+        if (parts.size() != 2) {
+            throw new ValueError(
+                "Invalid position: \"" + str + "\"");
+        }
+
+        var latitude = parts[0].toFloat();
+        var longitude = parts[1].toFloat();
+        if (latitude == null || longitude == null || 
+                latitude < -90 || latitude > 90 || longitude <= -180 || longitude > 180) {
+            throw new ValueError(
+                "Invalid position: \"" + str + "\"");
+        }
+
+        return [latitude, longitude];
+    }
+
+    function dumpLatLong(latLong as LatLong) as String {
+        /*
+        Format position as comma-separated decimal lat/long string with 8 decimal places
+        */
+        return latLong[0].format("%.8f") + "," + latLong[1].format("%.8f");
+    }
+
     function addRadians(angle as Radians?, delta as Radians?) as Radians? {
         /*
         Add radians to a base angle, while keeping in [0, 2 pi) range
@@ -126,7 +157,7 @@ module NavUtils {
         :return: Tuple [degrees, minutes, seconds]
         */
         if (degrees < 0) {
-            throw new Lang.InvalidValueException(
+            throw new ValueError(
                 "`degrees` must be non-negative");
         } else {
             var seconds = Math.round(degrees * 3600).toNumber();
@@ -174,9 +205,9 @@ module NavUtils {
             :minAngle: Minimum angle in degrees between accelerometer and magnetometer (default: 8)
         :return: Bearing in radians (if defined) in range [0, 2 * pi)
         */       
-        var minAccelerometer = getDefault(options, :minAccelerometer, 750.0) as Float;
-        var minMagnetometer = getDefault(options, :minMagnetometer, 100.0) as Float;
-        var minAngleDegrees = getDefault(options, :minAngle, 8.0) as Numeric;
+        var minAccelerometer = Utils.getDefault(options, :minAccelerometer, 750.0) as Float;
+        var minMagnetometer = Utils.getDefault(options, :minMagnetometer, 100.0) as Float;
+        var minAngleDegrees = Utils.getDefault(options, :minAngle, 8.0) as Numeric;
 
         if ((a == null) || (m == null)) {
             // Null sensor data sometimes supplied on app startup
@@ -278,12 +309,12 @@ module NavUtils {
 
     (:test)
     function testAddRadians(logger as Logger) as Boolean {
-        assertFloatEqual(addRadians(0.0, Math.PI / 2), Math.PI / 2, {:tol => 1e-6});
-        assertFloatEqual(addRadians(0.0, -Math.PI / 2), 3 * Math.PI / 2, {:tol => 1e-6});
-        assertFloatEqual(addRadians(0.0, 2 * Math.PI), 0.0, {:tol => 1e-6});
-        assertFloatEqual(addRadians(0.0, -2 * Math.PI), 0.0, {:tol => 1e-6});
-        assertFloatEqual(addRadians(Math.PI, Math.PI), 0.0, {:tol => 1e-6});
-        assertFloatEqual(addRadians(Math.PI / 2, -Math.PI / 2), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(addRadians(0.0, Math.PI / 2), Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(addRadians(0.0, -Math.PI / 2), 3 * Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(addRadians(0.0, 2 * Math.PI), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(addRadians(0.0, -2 * Math.PI), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(addRadians(Math.PI, Math.PI), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(addRadians(Math.PI / 2, -Math.PI / 2), 0.0, {:tol => 1e-6});
         return true;
     }
 
@@ -295,97 +326,97 @@ module NavUtils {
 
         // --- FACING N --- //
         // Looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 400.0, 0.0], {}), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 400.0, 0.0], {}), 0.0, {:tol => 1e-6});
 
         // Bring the device to eye level
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
 
         // Tilt it 45* left or right
-        assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
-        assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, -400.0], {}), 0.0, {:tol => 1e-6});
 
         // Looking straight up at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, -400.0, 0.0], {}), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, -400.0, 0.0], {}), 0.0, {:tol => 1e-6});
 
         // --- FACING NE --- //
         // Looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, 283.0, 0.0], {}), Math.PI / 4, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, 283.0, 0.0], {}), Math.PI / 4, {:tol => 1e-6});
 
         // --- FACING E --- //
         // Looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // Bring the device to eye level
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // Tilt it 45* left or right
-        assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [-283.0, 283.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
-        assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [-283.0, -283.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [-283.0, 283.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [-283.0, -283.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // Looking straight up at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [-400.0, 0.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // --- FACING SE --- //
         // Looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, -283.0, 0.0], {}), 3 * Math.PI / 4, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [-283.0, -283.0, 0.0], {}), 3 * Math.PI / 4, {:tol => 1e-6});
 
         // --- FACING S --- //
         // Looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, -400.0, 0.0], {}), Math.PI, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, -400.0, 0.0], {}), Math.PI, {:tol => 1e-6});
 
         // Bring the device to eye level
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
 
         // Tilt it 45* left or right
-        assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
-        assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [0.0, 0.0, 400.0], {}), Math.PI, {:tol => 1e-6});
 
         // Looking straight up at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 400.0, 0.0], {}), Math.PI, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 400.0, 0.0], {}), Math.PI, {:tol => 1e-6});
 
         // --- FACING SW --- //
         // Looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, -283.0, 0.0], {}), 5 * Math.PI / 4, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, -283.0, 0.0], {}), 5 * Math.PI / 4, {:tol => 1e-6});
 
         // --- FACING W --- //
         // Looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
 
         // Bring the device to eye level
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
 
         // Tilt it 45* left or right
-        assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [283.0, -283.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
-        assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [283.0, 283.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([-707.0, -707.0, 0.0], [283.0, -283.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([707.0, -707.0, 0.0], [283.0, 283.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
 
         // Looking straight up at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [400.0, 0.0, 0.0], {}), 3 * Math.PI / 2, {:tol => 1e-6});
 
         // --- FACING NW --- //
         // Looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, 283.0, 0.0], {}), 7 * Math.PI / 4, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [283.0, 283.0, 0.0], {}), 7 * Math.PI / 4, {:tol => 1e-6});
 
 
         // Test scenario 2: Magnetic field of 500 uT running down into ground at 53.13 degrees (3-4-5 triangle)
 
         // Facing N, looking down at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 300.0, -400.0], {}), 0.0, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 300.0, -400.0], {}), 0.0, {:tol => 1e-6});
 
         // Facing W, looking across at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-300.0, -400.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, -1000.0, 0.0], [-300.0, -400.0, 0.0], {}), Math.PI / 2, {:tol => 1e-6});
 
         // Facing S, looking straight up at device
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 300.0, 400.0], {}), Math.PI, {:tol => 1e-6});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, 1000.0], [0.0, 300.0, 400.0], {}), Math.PI, {:tol => 1e-6});
 
 
         // Test scenario 3: Magnetic field aligned with gravity
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 0.0, -500.0], {}), null, {});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 0.0, -500.0], {}), null, {});
 
         // Test scenario 4: Weak magnetic field
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 50.0, 0.0], {}), null, {});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -1000.0], [0.0, 50.0, 0.0], {}), null, {});
 
         // Test scenario 5: Weak gravity
-        assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -500.0], [0.0, 300.0, 0.0], {}), null, {});
+        TestUtils.assertFloatEqual(getBearingFromMagneticNorth([0.0, 0.0, -500.0], [0.0, 300.0, 0.0], {}), null, {});
 
         return true;
     }
