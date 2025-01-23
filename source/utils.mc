@@ -10,7 +10,7 @@ Created: 11 Jan 2025 by Boston W
 *******************************************************************************/
 
 
-const TWO_PI = 2 * Math.PI as Float;
+const TWO_PI = 2.0f * Math.PI as Float;
 
 
 module NavUtils {

@@ -205,9 +205,9 @@ module NavUtils {
             :minAngle: Minimum angle in degrees between accelerometer and magnetometer (default: 8)
         :return: Bearing in radians (if defined) in range [0, 2 * pi)
         */       
-        var minAccelerometer = Utils.getDefault(options, :minAccelerometer, 750.0) as Float;
-        var minMagnetometer = Utils.getDefault(options, :minMagnetometer, 100.0) as Float;
-        var minAngleDegrees = Utils.getDefault(options, :minAngle, 8.0) as Numeric;
+        var minAccelerometer = Utils.getDefault(options, :minAccelerometer, 750.0f) as Float;
+        var minMagnetometer = Utils.getDefault(options, :minMagnetometer, 100.0f) as Float;
+        var minAngleDegrees = Utils.getDefault(options, :minAngle, 8.0f) as Numeric;
 
         if ((a == null) || (m == null)) {
             // Null sensor data sometimes supplied on app startup

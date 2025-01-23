@@ -22,9 +22,9 @@ WGS84 model
 
 // Spheroid parameters
 const R = 6378137.0f;
-const K0 = 0.9996;
+const K0 = 0.9996f;
 
-const E = 0.00669438;
+const E = 0.00669438f;
 const E2 = E * E;
 const E3 = E2 * E;
 const E_P2 = E / (1.0f - E);
