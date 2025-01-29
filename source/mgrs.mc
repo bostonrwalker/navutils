@@ -1,5 +1,6 @@
 import Toybox.Lang;
 using Toybox.Math;
+using Toybox.Position;
 using Toybox.Test;
 using Toybox.System;
 
@@ -106,11 +107,20 @@ module NavUtils {
         var zoneNumber;
         var zoneLetter;
         if (zone.length() == 2) {
+            // Single-digit zone number
             zoneNumber = zone.substring(0, 1).toNumber();
             zoneLetter = zone.substring(1, 2).toCharArray()[0];
-        } else {
+        } else if (zone.length() == 3) {
+            // Two-digit zone number
             zoneNumber = zone.substring(0, 2).toNumber();
+            if (zoneNumber < 10) {
+                throw new ValueError(
+                    "Invalid UTM zone: " + zone.toString());
+            }
             zoneLetter = zone.substring(2, 3).toCharArray()[0];
+        } else {
+            throw new ValueError(
+                "Invalid UTM zone: " + zone.toString());
         }
 
         if (zoneLetter < 'C' || zoneLetter > 'X' || zoneLetter == 'I' || zoneLetter == 'O' ||  // Valid zone letter range
@@ -333,6 +343,13 @@ module NavUtils {
         return mgrs[0] + " " + mgrs[1] + " " + mgrs[2].format("%05d") + " " + mgrs[3].format("%05d");
     }
 
+    function locationToMGRS(location as Position.Location) as MGRS {
+        /*
+        Convert Position.Location to MGRS
+        */
+        return readMGRS(location.toGeoString(Position.GEO_MGRS));
+    }
+
     function _validateMGRS(mgrs as MGRS) as Void {
         /*
         Validate that MGRS coordinates look legit
@@ -404,8 +421,20 @@ module NavUtils {
         var easting = mgrs[2];
         var northing = mgrs[3];
 
-        var zoneNumber = zone.substring(0, 2).toNumber();
-        var zoneLetter = zone.substring(2, 3).toCharArray()[0];
+        var zoneNumber;
+        var zoneLetter;
+        if (StringUtils.isNumeric(zone.substring(1, 2))) {
+            zoneNumber = zone.substring(0, 2).toNumber();
+            zoneLetter = zone.substring(2, 3).toUpper().toCharArray()[0];
+        } else {
+            zoneNumber = zone.substring(0, 1).toNumber();
+            zoneLetter = zone.substring(1, 2).toUpper().toCharArray()[0];
+        }
+
+        if (zoneNumber == null) {
+            throw new ValueError(
+                "Invalid UTM zone: " + zone);
+        }
 
         var gzdLonMin;
         if (zoneNumber % 3 == 1) {
@@ -593,6 +622,7 @@ module NavUtils {
             ["18T", "UV", 50000, -1],  // Northing out of range
             ["18T", "UV", 50000, 100000],
             ["32X", "AB", 55000, 12345],  // 32X does not exist
+            // ["1C", "AA", 0, 1],  // Not easy to deal with, technically valid
         ];
 
         for (var i = 0; i < tests.size(); i++) {
