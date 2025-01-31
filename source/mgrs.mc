@@ -96,24 +96,26 @@ module NavUtils {
     */
     typedef MGRS as [String, String, Number, Number];
 
-    function _validateUTMZone(zone as String) as Void {
+    function _parseUTMZone(zone as String) as [Number, Char] {
         /*
-        Validate that UTM zone looks legit
+        Parse UTM zone into number and letter and check if it looks legit
 
         :raise ValueError: If UTM zone is invalid
         */
-
-        // Read first two digits of zone
         var zoneNumber;
         var zoneLetter;
         if (zone.length() == 2) {
             // Single-digit zone number
             zoneNumber = zone.substring(0, 1).toNumber();
+            if (zoneNumber == null) {
+                throw new ValueError(
+                    "Invalid UTM zone: " + zone.toString());
+            }
             zoneLetter = zone.substring(1, 2).toCharArray()[0];
         } else if (zone.length() == 3) {
             // Two-digit zone number
             zoneNumber = zone.substring(0, 2).toNumber();
-            if (zoneNumber < 10) {
+            if (zoneNumber == null || zoneNumber < 10) {
                 throw new ValueError(
                     "Invalid UTM zone: " + zone.toString());
             }
@@ -135,6 +137,8 @@ module NavUtils {
             throw new ValueError(
                 "Unsupported zone (UPS): " + zone);
         }
+
+        return [zoneNumber, zoneLetter];
     }
 
     function _validateUTM(utm as UTM) as Void {
@@ -147,7 +151,7 @@ module NavUtils {
         var easting = utm[1];
         var northing = utm[2];
 
-        _validateUTMZone(zone);
+        _parseUTMZone(zone);  // Parse will raise error
 
         if (easting < 100000 || easting >= 1000000 || northing < 0 || northing >= 10000000) {
             throw new ValueError(
@@ -175,8 +179,9 @@ module NavUtils {
         var easting = utm[1];
         var northing = utm[2];
 
-        var zoneNumber = zone.substring(0, 2).toNumber();
-        var zoneLetter = zone.substring(2, 3).toCharArray()[0];
+        var zoneParsed = _parseUTMZone(zone);
+        var zoneNumber = zoneParsed[0];
+        var zoneLetter = zoneParsed[1];
 
         var x = easting - 500000;
         var y;
@@ -252,21 +257,22 @@ module NavUtils {
         :raise ValueError: If string format or MGRS coordiantes are invalid
         */
         str = StringUtils.removeTrailingWhitespace(StringUtils.removeLeadingWhitespace(str));
+        if (str.length() < 10) {
+            // Minimum length of an MGRS string with a 6-digit grid ref
+            throw new ValueError("Invalid MGRS: " + str);
+        }
 
         var zone;
         if (StringUtils.isNumeric(str.substring(1, 2))) {
-            var zoneNumber = str.substring(0, 2).toNumber();
-            if (zoneNumber == null) {
-                throw new ValueError(
-                    "Invalid UTM zone: " + str.substring(0, 3));
-            }
-            var zoneLetter = str.substring(2, 3).toUpper();
-            zone = zoneNumber.toString() + zoneLetter; // Converting to number and back removes leading zero if present
+            // Zone starts with two-digit number
+            zone = str.substring(0, 3).toUpper();
             str = str.substring(3, str.length());
         } else {
+            // Zone starts with single-digit number
             zone = str.substring(0, 2).toUpper();
             str = str.substring(2, str.length());
         }
+        _parseUTMZone(zone);  // Use to validate
 
         str = StringUtils.removeLeadingWhitespace(str);
 
@@ -361,10 +367,9 @@ module NavUtils {
         var easting = mgrs[2];
         var northing = mgrs[3];
 
-        _validateUTMZone(zone);
-
-        var zoneNumber = zone.substring(0, 2).toNumber();
-        // var zoneLetter = zone.substring(2, 3).toCharArray()[0];
+        var zoneParsed = _parseUTMZone(zone);
+        var zoneNumber = zoneParsed[0];
+        // var zoneLetter = zoneParsed[1];
 
         /* 
         Check that the second letter of the MGRS string is within the range of valid second letter values.
@@ -421,20 +426,10 @@ module NavUtils {
         var easting = mgrs[2];
         var northing = mgrs[3];
 
-        var zoneNumber;
-        var zoneLetter;
-        if (StringUtils.isNumeric(zone.substring(1, 2))) {
-            zoneNumber = zone.substring(0, 2).toNumber();
-            zoneLetter = zone.substring(2, 3).toUpper().toCharArray()[0];
-        } else {
-            zoneNumber = zone.substring(0, 1).toNumber();
-            zoneLetter = zone.substring(1, 2).toUpper().toCharArray()[0];
-        }
 
-        if (zoneNumber == null) {
-            throw new ValueError(
-                "Invalid UTM zone: " + zone);
-        }
+        var zoneParsed = _parseUTMZone(zone);
+        var zoneNumber = zoneParsed[0];
+        var zoneLetter = zoneParsed[1];
 
         var gzdLonMin;
         if (zoneNumber % 3 == 1) {
