@@ -1,8 +1,8 @@
 import Toybox.Lang;
-import Toybox.Time;
-import Toybox.Position;
-import Toybox.Math;
-import Toybox.Test;
+using Toybox.Time;
+using Toybox.Position;
+using Toybox.Math;
+using Toybox.Test;
 
 
 /*******************************************************************************
@@ -15,6 +15,9 @@ Created: 11 Jan 2025 by Boston W
 
 
 module NavUtils {
+    /*******************************************************************************
+    Typedefs
+    *******************************************************************************/
     /*
     Radians type alias. Added for clarity when defining method signatures.
 
@@ -51,14 +54,27 @@ module NavUtils {
     */
     typedef Mils as Number;
 
+    /*
+    Meters. Added for clarity when defining method signatures/units. Range: [0, Inf)
+    */
+    typedef Meters as Numeric;
 
-    function readLatLong(str as String) as LatLong {
+
+    /*******************************************************************************
+    Parsing and formatting functions
+    *******************************************************************************/
+
+    function readLatLong(str as String, options as {:delimiter as String}) as LatLong {
         /*
         Parse comma-separated decimal lat/long string
     
+        :param str: Lat/long cooordinates to read
+        :param options:
+            :delimiter: Delimiter to look for between lat and long values (default: ",")
         :raise: InvalidValueException if string is invalid
         */
-        var parts = StringUtils.split(str, ",");
+        var delimiter = Utils.getDefault(options, :delimeter, ",") as String;
+        var parts = StringUtils.split(str, delimiter);
         if (parts.size() != 2) {
             throw new ValueError(
                 "Invalid position: \"" + str + "\"");
@@ -75,12 +91,21 @@ module NavUtils {
         return [latitude, longitude];
     }
 
-    function dumpLatLong(latLong as LatLong) as String {
+    function dumpLatLong(latLong as LatLong, options as {:delimiter as String}) as String {
         /*
         Format position as comma-separated decimal lat/long string with 8 decimal places
+
+        :param latLong: Lat/long cooordinates to format
+        :param options:
+            :delimiter: Delimiter to put between lat and long values (default: ",")
         */
-        return latLong[0].format("%.8f") + "," + latLong[1].format("%.8f");
+        var delimiter = Utils.getDefault(options, :delimeter, ",") as String;
+        return latLong[0].format("%.8f") + delimiter + latLong[1].format("%.8f");
     }
+
+    /*******************************************************************************
+    Addition and conversion
+    *******************************************************************************/
 
     function addRadians(angle as Radians?, delta as Radians?) as Radians? {
         /*
@@ -147,6 +172,26 @@ module NavUtils {
         }
     }
 
+    function radsToCardinalDir(rads as Radians, precision as Number) as String {
+        // Convert radians to cardinal direction
+        // Precision 1: N, E, S, W
+        // Precision 2: NE, SW, etc.
+        // Precision 3: NNE, SSW, ESW, etc.
+        if (precision == 1) {
+            var index = Math.round(4.0f * (rads / TWO_PI)).toNumber() % 4;
+            return CARDINAL_DIRS_PRECISION_1[index];
+        } else if (precision == 2) {
+            var index = Math.round(8.0f * (rads / TWO_PI)).toNumber() % 8;
+            return CARDINAL_DIRS_PRECISION_2[index];
+        } else if (precision == 3) {
+            var index = Math.round(16.0f * (rads / TWO_PI)).toNumber() % 16;
+            return CARDINAL_DIRS_PRECISION_3[index];
+        } else {
+            throw new ValueError(
+                "Invalid precision: " + precision.toString());
+        }
+    }
+
     function decimalDegreesToDMS(degrees as DecimalDegrees) as DMS {
         /*
         Convert decimal degrees to integer degrees, minutes, seconds
@@ -184,6 +229,140 @@ module NavUtils {
 
         return degrees.toFloat() + minutes / 60.0 + seconds / 3600.0;
     }
+
+    function locationToLatLong(location as Position.Location) as LatLong {
+        /*
+        Convert Position.Location to LatLong (geodetic)
+        */
+        var doubleDegrees = location.toDegrees();
+        return [doubleDegrees[0].toFloat(), doubleDegrees[1].toFloat()];
+    }
+
+    function latLongToLocation(latLong as LatLong) as Position.Location {
+        /*
+        Convert LatLong (geodetic) to Position.Location
+        */
+        return new Position.Location({:latitude => latLong[0], :longitude => latLong[1], :format => :degrees});
+    }
+
+    /*******************************************************************************
+    Distance and bearing using Great circle
+    ********************************************************************************
+    Prior art: https://www.movable-type.co.uk/scripts/latlong.html
+    *******************************************************************************/
+
+    function distance(p1 as LatLong or Position.Location, p2 as LatLong or Position.Location) as Meters {
+        /*
+        Compute the Great Circle distance between two points on Earth's surface using the Haversine formula.
+        http://www.movable-type.co.uk/scripts/latlong.html
+
+        :param p1: Point in geodetic (lat/long) coordinates
+        :param p2: Point in geodetic (lat/long) coordinates
+        :return: Great circle distance in meters
+        */
+        // Handle Position.Location objects
+        p1 = p1 instanceof Position.Location ? locationToLatLong(p1) : p1;
+        p2 = p2 instanceof Position.Location ? locationToLatLong(p2) : p2;
+
+        // Convert degrees to rads
+        var lat1 = p1[0] * TWO_PI / 360.0f;
+        var long1 = p1[1] * TWO_PI / 360.0f;
+        var lat2 = p2[0] * TWO_PI / 360.0f;
+        var long2 = p2[1] * TWO_PI / 360.0f;
+
+        // Take the difference
+        var deltaLat = lat2 - lat1;
+        var deltaLong = long2 - long1;
+
+        // Reused quantities
+        var sinDeltaLatOver2 = Math.sin(deltaLat / 2.0f);
+        var sinDeltaLongOver2 = Math.sin(deltaLong / 2.0f);
+
+        var a = sinDeltaLatOver2 * sinDeltaLatOver2 + Math.cos(lat1) * Math.cos(lat2) * sinDeltaLongOver2 * sinDeltaLongOver2;
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+    
+    function bearing(start as LatLong or Position.Location, end as LatLong or Position.Location) as Radians {
+        /*
+        Compute initial bearing along Great Circle from start point to end point
+        http://www.movable-type.co.uk/scripts/latlong.html
+
+        :param start: Point in geodetic (lat/long) coordinates
+        :param end: Point in geodetic (lat/long) coordinates
+        :return: Bearing from start to end along Great Circle in radians
+        */
+        // Handle Position.Location objects
+        start = start instanceof Position.Location ? locationToLatLong(start) : start;
+        end = end instanceof Position.Location ? locationToLatLong(end) : end;
+
+        // Convert degrees to rads
+        var lat1 = start[0] * TWO_PI / 360.0f;
+        var long1 = start[1] * TWO_PI / 360.0f;
+        var lat2 = end[0] * TWO_PI / 360.0f;
+        var long2 = end[1] * TWO_PI / 360.0f;
+
+        // Take the difference
+        var deltaLong = long2 - long1;
+
+        // Do some trig
+        var y = Math.sin(deltaLong) * Math.cos(lat2);
+        var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLong);
+        var theta = Math.atan2(y, x);
+        if (theta < 0.0f) {
+            theta += TWO_PI;
+        }
+        return theta;
+    }
+    
+    function distanceAndBearing(start as LatLong or Position.Location, end as LatLong or Position.Location) as [Meters, Radians] {
+        /*
+        Compute distance and initial bearing along Great Circle from start point to end point.
+        More efficient than using distance() and bearing() functions separately.
+        http://www.movable-type.co.uk/scripts/latlong.html
+
+        :param start: Point in geodetic (lat/long) coordinates
+        :param end: Point in geodetic (lat/long) coordinates
+        :return: Distance in meters and bearing in radians from start to end along Great Circle
+        */
+        // Handle Position.Location objects
+        start = start instanceof Position.Location ? locationToLatLong(start) : start;
+        end = end instanceof Position.Location ? locationToLatLong(end) : end;
+
+        // Convert degrees to rads
+        var lat1 = start[0] * TWO_PI / 360.0f;
+        var long1 = start[1] * TWO_PI / 360.0f;
+        var lat2 = end[0] * TWO_PI / 360.0f;
+        var long2 = end[1] * TWO_PI / 360.0f;
+
+        // Take the difference
+        var deltaLat = lat2 - lat1;
+        var deltaLong = long2 - long1;
+    
+        // Reused quantities
+        var sinDeltaLatOver2 = Math.sin(deltaLat / 2.0f);
+        var sinDeltaLongOver2 = Math.sin(deltaLong / 2.0f);
+        var cosLat1 = Math.cos(lat1);
+        var cosLat2 = Math.cos(lat2);
+
+        // Do some trig
+        var a = sinDeltaLatOver2 * sinDeltaLatOver2 + Math.cos(lat1) * Math.cos(lat2) * sinDeltaLongOver2 * sinDeltaLongOver2;
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        var y = Math.sin(deltaLong) * cosLat2;
+        var x = cosLat1 * Math.sin(lat2) - Math.sin(lat1) * cosLat2 * Math.cos(deltaLong);
+        var theta = Math.atan2(y, x);
+        if (theta < 0.0f) {
+            theta += TWO_PI;
+        }
+
+        return [R * c, theta];
+    }
+
+    /*******************************************************************************
+    Compass headings
+    *******************************************************************************/
 
     function getBearingFromMagneticNorth(a as [Numeric, Numeric, Numeric]?, m as [Numeric, Numeric, Numeric]?, options as {
             :minAccelerometer as Numeric, :minMagnetometer as Numeric, :minAngle as Numeric}) as Radians? {
@@ -296,19 +475,19 @@ module NavUtils {
         return angle;
     }
 
-    function applyMagneticDeclination(heading as Radians?, magDec as Radians?) as Radians? {
+    function applyMagneticDeclination(heading as Radians?, magDec as DecimalDegrees?) as Radians? {
         /*
         Subtract magnetic declination from magnetic N heading
 
         :param heading: Heading from magnetic N in rads
         :param magDec: Mag dec in degrees. Per convention W is positive and E is negative.
         */
-        return addRadians(heading, -degreesToRads(magDec));
+        return addRadians(heading, degreesToRads(magDec));
     }
 
 
     (:test)
-    function testAddRadians(logger as Logger) as Boolean {
+    function testAddRadians(logger as Test.Logger) as Boolean {
         TestUtils.assertFloatEqual(addRadians(0.0, Math.PI / 2), Math.PI / 2, {:tol => 1e-6});
         TestUtils.assertFloatEqual(addRadians(0.0, -Math.PI / 2), 3 * Math.PI / 2, {:tol => 1e-6});
         TestUtils.assertFloatEqual(addRadians(0.0, 2 * Math.PI), 0.0, {:tol => 1e-6});
@@ -320,7 +499,7 @@ module NavUtils {
 
 
     (:test)
-    function testGetBearingFromMagneticNorth(logger as Logger) as Boolean {
+    function testGetBearingFromMagneticNorth(logger as Test.Logger) as Boolean {
 
         // Test scenario 1: Magnetic field of 400 uT parallel to ground
 

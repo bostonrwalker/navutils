@@ -17,20 +17,11 @@ https://github.com/Turbo87/utm/
 Created: 11 Jan 2025 by Boston W
 *******************************************************************************/
 
-/*
-WGS84 model
-*/
-
-// Spheroid parameters
-const R = 6378137.0f;
-const K0 = 0.9996f;
-
-const E = 0.00669438f;
+// Precomputed constants
 const E2 = E * E;
 const E3 = E2 * E;
 const E_P2 = E / (1.0f - E);
 
-// Precomputed constants
 const SQRT_E = Math.sqrt(1.0f - E);
 const _E = (1.0f - SQRT_E) / (1.0f + SQRT_E);
 const _E2 = _E * _E;
@@ -47,7 +38,6 @@ const P2 = (3.0f / 2.0f * _E - 27.0f / 32.0f * _E3 + 269.0f / 512.0f * _E5);
 const P3 = (21.0f / 16.0f * _E2 - 55.0f / 32.0f * _E4);
 const P4 = (151.0f / 96.0f * _E3 - 417.0f / 128.0f * _E5);
 const P5 = (1097.0f / 512.0f * _E4);
-
 
 typedef LatitudeBand as [Number, Float, Float];
 
