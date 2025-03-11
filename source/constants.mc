@@ -7,8 +7,9 @@ Constants
 Created: 4 Feb 2025 by Boston W
 *******************************************************************************/
 
-const HALF_PI = 0.5f * Math.PI as Float;
-const TWO_PI = 2.0f * Math.PI as Float;
+const PI = Math.PI.toFloat();
+const HALF_PI = 0.5f * PI;
+const TWO_PI = 2.0f * PI;
 
 /*
 WGS84 model

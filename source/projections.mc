@@ -70,28 +70,43 @@ module NavUtils {
             var cosPhi = Math.cos(phi);
             var sinPhi = Math.sin(phi);
             var cosLambda = Math.cos(lambda);
-            var sinLambda = Math.sin(lambda);
 
-            var c = Math.acos(_sinPhi0 * sinPhi + _cosPhi0 * cosPhi * cosLambda);  // Angular distance c
-
-            if (c > -HALF_PI && c < HALF_PI) {
-                // Perform projection
-                var x = cosPhi * sinLambda;
-                var y = _cosPhi0 * sinPhi - _sinPhi0 * cosPhi * cosLambda;
-
-                if (_rotation != 0.0f) {
-                    // Convert to polar coords and rotate
-                    var r = _scaleFactor * Math.sqrt(x * x + y * y);
+            var cosC = _sinPhi0 * sinPhi + _cosPhi0 * cosPhi * cosLambda;  // Cosine of angular distance c
+            if (cosC > 0) {
+                // Point is in the correct hemisphere
+                var sinC = Math.sqrt(1 - cosC * cosC);
+                var r = sinC / _radius;
+                if (r < 1) {
+                    // Point is within view
+                    var sinLambda = Math.sin(lambda);
+                    var x = cosPhi * sinLambda; 
+                    var y = _cosPhi0 * sinPhi - _sinPhi0 * cosPhi * cosLambda;
                     var theta = Math.atan2(x, -y) + _rotation;  // Degrees clockwise from N
                     return [r * Math.sin(theta), -r * Math.cos(theta)];
-                } else {
-                    // Just rescale
-                    return [_scaleFactor * x, _scaleFactor * y];
                 }
-            } else {
-                return null;
             }
+            return null;
         }
+
+        /*
+        function getDomain() as [[Radians, Radians], [Radians, Radians]] {
+            //
+            Get domain of this projection
+
+            :return:
+                [0]: Phi (latitude) min/max
+                [1]: Lambda (longitude) min/max
+            //
+            var phiMin = addRadians(_lambda0, Math.asin(-_radius / _cosPhi0));
+            var phiMax = addRadians(_lambda0, Math.asin(_radius / _cosPhi0));
+
+            var t = _radius / (_cosPhi0 * _sinPhi0);
+            var lambdaMin = Math.acos(1 + t);
+            var lambdaMax = Math.acos(1 - t);
+
+            return [[phiMin, phiMax], [lambdaMin, lambdaMax]] as [[Radians, Radians], [Radians, Radians]];
+        }
+        */
 
         function toString() as String {
             return "NavUtils.OrthographicProjection{" +
